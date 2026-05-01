@@ -1,8 +1,8 @@
 # 📥 Bot de Descarga Automatizada
 
-Automatización en **Python + Playwright** que se conecta a un portal web, aplica filtros desde un archivo Excel y descarga los archivos resultantes.
+Automatización en **Python + Playwright** que se conecta a un portal web, calcula un rango de fechas reciente (configurable), busca y descarga todos los archivos resultantes.
 
-El script queda **observando el Excel**: cada vez que guardes cambios, se ejecutará el proceso de búsqueda y descarga.
+Es un proceso **one-shot**: se ejecuta una vez, descarga, y termina. Para correrlo periódicamente, prográmalo con Windows Task Scheduler (o cron en Linux/Mac).
 
 ---
 
@@ -11,7 +11,7 @@ El script queda **observando el Excel**: cada vez que guardes cambios, se ejecut
 ```
 .
 ├── main.py                  # Entry point (CLI)
-├── runner.py                # Bucle observador del Excel
+├── runner.py                # Flujo: login → buscar → descargar
 ├── requirements.txt         # Dependencias del proyecto
 ├── README.md                # Documentación del proyecto
 ├── .env                     # Variables de entorno (ignorado en git)
@@ -23,12 +23,7 @@ El script queda **observando el Excel**: cada vez que guardes cambios, se ejecut
 │
 ├── core/                    # Infraestructura genérica
 │   ├── browser.py           # Context manager Playwright
-│   ├── logger.py            # log(), ts(), dump_debug()
-│   └── watcher.py           # Observador de cambios en Excel
-│
-├── domain/                  # Modelos y carga de datos
-│   ├── models.py            # @dataclass FilterRow
-│   └── excel.py             # Lectura + normalización del Excel
+│   └── logger.py            # log(), ts(), dump_debug()
 │
 ├── portal/                  # Adaptadores del sitio
 │   ├── auth.py              # Login
@@ -39,10 +34,7 @@ El script queda **observando el Excel**: cada vez que guardes cambios, se ejecut
 │   └── downloader.py        # Descarga de archivos
 │
 ├── utils/                   # Utilidades genéricas
-│   └── values.py            # is_empty, to_str, clean_row, etc.
-│
-├── data/
-│   └── dataset.xlsx         # Excel con filtros a aplicar
+│   └── values.py            # is_empty, to_str, etc.
 │
 ├── downloads/               # Archivos descargados
 └── logs/                    # Errores y capturas (HTML + PNG)
@@ -81,23 +73,101 @@ Crea un archivo `.env` en la raíz con:
 PORTAL_USER=tu_usuario
 PORTAL_PASS=tu_password
 BASE_URL=https://...
-DATASET_FILE=ruta/al/dataset.xlsx
-SHEET_NAME=NombreHoja
 DOWNLOADS_DIR=ruta/de/descargas
+DAYS_BACK=1
 TIMEOUT=30
 SUPPRESS_TLS_WARNINGS=True
 ```
 
-`BASE_URL` es **obligatorio**. Si falta, el script falla al iniciar.
+| Variable | Obligatorio | Descripción |
+|---|---|---|
+| `PORTAL_USER` | Sí | Usuario del portal |
+| `PORTAL_PASS` | Sí | Contraseña del portal |
+| `BASE_URL` | Sí | URL base del portal (sin slash final) |
+| `DOWNLOADS_DIR` | No | Carpeta destino. Default: `./downloads` |
+| `DAYS_BACK` | No | Días hacia atrás a descargar. Default: `1` (ayer → hoy) |
+| `TIMEOUT` | No | Timeout HTTP en segundos. Default: `30` |
+| `LOGIN_URL` / `SEARCH_URL` / `DOWNLOAD_URL` | No | Override de paths. Default: derivados de `BASE_URL` |
+
+### Filtros opcionales del formulario
+
+Todos opcionales — si están vacíos, no se aplican.
+
+| Variable | Tipo | Notas |
+|---|---|---|
+| `TIPO_LLAMADA` | select | Acepta nombre (`DIALER`, `INBOUND`, `MANUAL`, `PREVIEW`) o el value numérico (`1`–`4`) |
+| `TEL_CLIENTE` | texto | Teléfono del cliente |
+| `CALLID` | texto | Call ID exacto |
+| `AGENTE` | select | Acepta el ID numérico del agente o el nombre exacto del label |
+| `MARCADAS` | checkbox | `1`/`true`/`yes`/`sí` para marcar; cualquier otra cosa para desmarcar |
+| `GESTION` | checkbox | Mismo formato que `MARCADAS` |
 
 ---
 
-## 📊 Excel de entrada
+## 🧩 Ejemplos de uso
 
-- Archivo: `data/dataset.xlsx` (o el que indiques en `DATASET_FILE`).
-- Columnas admitidas: `fecha` / `fecha_rango`, `tipo_llamada`, `tel_cliente`, `callid`, `agente`, `campana`, `id_contacto_externo`, `duracion`, `marcadas` (1/0), `gestion` (1/0), `grabaciones_x_pagina`, `calificacion`.
+Cambia el comportamiento del bot editando solo el archivo `.env`. No necesitas tocar código.
 
-El script normaliza encabezados automáticamente (`Teléfono Cliente` → `tel_cliente`).
+### 1. Caso default — descargar todo lo de ayer
+```ini
+DAYS_BACK=1
+# (filtros en blanco)
+```
+Descarga todas las llamadas del rango `ayer → hoy`, sin filtros.
+
+### 2. Última semana, solo llamadas DIALER
+```ini
+DAYS_BACK=7
+TIPO_LLAMADA=DIALER
+```
+
+### 3. Un agente específico (por ID o por nombre)
+```ini
+DAYS_BACK=1
+AGENTE=550
+```
+o equivalentemente:
+```ini
+AGENTE=ALAN DIEGO CLAVIJO LAGOS
+```
+> El nombre debe coincidir **exacto** con el label del `<option>` en el portal (mayúsculas, espacios, acentos). Si dudas, usa el ID — más confiable.
+
+### 4. Buscar por teléfono o Call ID puntual
+```ini
+DAYS_BACK=30
+TEL_CLIENTE=70123456
+```
+o
+```ini
+DAYS_BACK=30
+CALLID=ABC123XYZ
+```
+
+### 5. Solo llamadas con gestión registrada
+```ini
+DAYS_BACK=1
+GESTION=1
+```
+
+### 6. Combinar varios filtros
+```ini
+DAYS_BACK=15
+TIPO_LLAMADA=INBOUND
+AGENTE=550
+MARCADAS=1
+GESTION=1
+```
+Solo llamadas INBOUND, del agente 550, marcadas y con gestión, en los últimos 15 días.
+
+### Tabla de mapeo de TIPO_LLAMADA
+| Nombre | Value interno |
+|---|---|
+| `MANUAL` | `1` |
+| `DIALER` | `2` |
+| `INBOUND` | `3` |
+| `PREVIEW` | `4` |
+
+Cualquiera de los dos formatos funciona en `TIPO_LLAMADA=`.
 
 ---
 
@@ -114,16 +184,22 @@ El script normaliza encabezados automáticamente (`Teléfono Cliente` → `tel_c
    python main.py
    ```
 
-El programa quedará en **modo observador**:
-- Espera cambios en el Excel.
-- Cuando detecta un guardado, carga las filas, aplica filtros y descarga los archivos en `downloads/`.
+El programa:
+- Calcula el rango `hoy - DAYS_BACK` → `hoy`.
+- Hace login, busca con ese rango y descarga todo en `DOWNLOADS_DIR`.
 - Si ocurre un error, genera HTML + captura en `logs/`.
+- Termina cuando todas las descargas se completan.
+
+### Programación periódica (Windows Task Scheduler)
+1. Abre el "Programador de tareas".
+2. Crear tarea básica → diaria → hora deseada.
+3. Acción: iniciar `venv\Scripts\python.exe` con argumento `main.py`, "Iniciar en" la carpeta del proyecto.
 
 ---
 
 ## 🛠️ Debug
 
-- Para ver el navegador en acción, cambia `headless=True` a `False` en `core/browser.py` o expón el flag por `.env`.
+- Para ver el navegador en acción, cambia `headless=True` a `False` en [core/browser.py](core/browser.py).
 - Los errores se guardan en `logs/` como:
   - HTML (`.html`)
   - Captura de pantalla (`.png`)
@@ -132,16 +208,13 @@ El programa quedará en **modo observador**:
 
 ## 📦 Dependencias principales
 
-- Playwright — Automatización del navegador.
-- Pandas — Manejo de Excel.
-- OpenPyXL — Lectura de `.xlsx`.
-- python-dotenv — Variables de entorno.
+- **Playwright** — Automatización del navegador.
+- **python-dotenv** — Variables de entorno.
 
 ---
 
 ## ✨ Notas
 
-- Si el portal cambia sus selectores, edita `config/selectors.py` o los módulos en `portal/`.
-- Si necesitas ajustar timeouts/tiempos de espera, edita `config/timings.py`.
-- Si el Excel está abierto mientras guardas, puede bloquearse; el script reintenta varias veces.
-- Para detener el observador: **Ctrl + C** en la terminal.
+- Si el portal cambia sus selectores, edita [config/selectors.py](config/selectors.py) o los módulos en `portal/`.
+- Si necesitas ajustar timeouts/tiempos de espera, edita [config/timings.py](config/timings.py).
+- Para detener una ejecución en curso: **Ctrl + C** en la terminal.

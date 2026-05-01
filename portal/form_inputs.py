@@ -1,4 +1,4 @@
-"""Helpers para llenar inputs, selects y checkboxes del formulario de búsqueda."""
+"""Helpers para llenar inputs, selects y checkboxes del formulario."""
 from __future__ import annotations
 
 from config.timings import SHORT_MS
@@ -55,17 +55,22 @@ def set_text(page, sel: str, value: str) -> None:
 
 
 def select_option(page, sel: str, value: str) -> None:
-    """Selecciona en un <select> por value y luego por label como fallback."""
+    """Selecciona en un <select> probando primero por value, luego por label.
+
+    Funciona también con selects mejorados con Select2 — Playwright manipula el
+    <select> nativo y Select2 escucha los eventos `change`.
+    """
     if is_empty(value):
         return
     page.wait_for_selector(sel, timeout=SHORT_MS)
+    s = str(value).strip()
     try:
-        page.select_option(sel, value=value)
+        page.select_option(sel, value=s)
         return
     except Exception:
         pass
     try:
-        page.select_option(sel, label=value)
+        page.select_option(sel, label=s)
     except Exception:
         pass
 

@@ -19,9 +19,17 @@ LOGIN_URL    = os.getenv("LOGIN_URL",    f"{BASE_URL}/accounts/login/")
 SEARCH_URL   = os.getenv("SEARCH_URL",   f"{BASE_URL}/grabacion/buscar/")
 DOWNLOAD_URL = os.getenv("DOWNLOAD_URL", f"{BASE_URL}/grabacion/descargar/")
 
-# === Dataset ===
-DATASET_FILE = Path(os.getenv("DATASET_FILE", BASE_DIR / "data" / "dataset.xlsx"))
-SHEET_NAME   = os.getenv("SHEET_NAME", "Sheet1")
+# === Rango de descarga ===
+# Cuántos días hacia atrás buscar. Default: 1 (ayer → hoy).
+DAYS_BACK = int(os.getenv("DAYS_BACK", "1"))
+
+# === Filtros opcionales (vacío = sin filtro) ===
+TIPO_LLAMADA = os.getenv("TIPO_LLAMADA", "")
+TEL_CLIENTE  = os.getenv("TEL_CLIENTE", "")
+CALLID       = os.getenv("CALLID", "")
+AGENTE       = os.getenv("AGENTE", "")
+MARCADAS     = os.getenv("MARCADAS", "")
+GESTION      = os.getenv("GESTION", "")
 
 # === Descargas ===
 DOWNLOADS_DIR = Path(os.getenv("DOWNLOADS_DIR", BASE_DIR / "downloads"))
@@ -34,7 +42,6 @@ SUPPRESS_TLS_WARNINGS = str(os.getenv("SUPPRESS_TLS_WARNINGS", "true")).strip().
 
 # === Carpetas ===
 LOGS_DIR = BASE_DIR / "logs"
-DATA_DIR = BASE_DIR / "data"
 
-for folder in (LOGS_DIR, DOWNLOADS_DIR, DATA_DIR):
+for folder in (LOGS_DIR, DOWNLOADS_DIR):
     folder.mkdir(parents=True, exist_ok=True)
