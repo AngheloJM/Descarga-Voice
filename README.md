@@ -86,6 +86,7 @@ SUPPRESS_TLS_WARNINGS=True
 | `BASE_URL` | Sí | URL base del portal (sin slash final) |
 | `DOWNLOADS_DIR` | No | Carpeta destino. Default: `./downloads` |
 | `DAYS_BACK` | No | Días hacia atrás a descargar. Default: `1` (ayer → hoy) |
+| `HEADLESS` | No | `true`/`false`. Default `true`. Pon `false` para ver el navegador |
 | `TIMEOUT` | No | Timeout HTTP en segundos. Default: `30` |
 | `LOGIN_URL` / `SEARCH_URL` / `DOWNLOAD_URL` | No | Override de paths. Default: derivados de `BASE_URL` |
 
@@ -101,6 +102,7 @@ Todos opcionales — si están vacíos, no se aplican.
 | `AGENTE` | select | Acepta el ID numérico del agente o el nombre exacto del label |
 | `MARCADAS` | checkbox | `1`/`true`/`yes`/`sí` para marcar; cualquier otra cosa para desmarcar |
 | `GESTION` | checkbox | Mismo formato que `MARCADAS` |
+| `GRABACIONES_X_PAGINA` | select | Cuántas grabaciones muestra por página (`10`, `25`, `50`, `100`...). **Subirlo reduce mucho la cantidad de páginas a recorrer** y hace la descarga más rápida y estable. Recomendado: `100` |
 
 ---
 

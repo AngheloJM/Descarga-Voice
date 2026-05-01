@@ -6,6 +6,11 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BASE_DIR / ".env")
 
+
+def _is_truthy(s: str) -> bool:
+    return str(s).strip().lower() in ("1", "true", "yes", "y", "on", "si", "sí")
+
+
 # === Credenciales (obligatorias) ===
 PORTAL_USER = os.getenv("PORTAL_USER", "")
 PORTAL_PASS = os.getenv("PORTAL_PASS", "")
@@ -24,21 +29,23 @@ DOWNLOAD_URL = os.getenv("DOWNLOAD_URL", f"{BASE_URL}/grabacion/descargar/")
 DAYS_BACK = int(os.getenv("DAYS_BACK", "1"))
 
 # === Filtros opcionales (vacío = sin filtro) ===
-TIPO_LLAMADA = os.getenv("TIPO_LLAMADA", "")
-TEL_CLIENTE  = os.getenv("TEL_CLIENTE", "")
-CALLID       = os.getenv("CALLID", "")
-AGENTE       = os.getenv("AGENTE", "")
-MARCADAS     = os.getenv("MARCADAS", "")
-GESTION      = os.getenv("GESTION", "")
+TIPO_LLAMADA         = os.getenv("TIPO_LLAMADA", "")
+TEL_CLIENTE          = os.getenv("TEL_CLIENTE", "")
+CALLID               = os.getenv("CALLID", "")
+AGENTE               = os.getenv("AGENTE", "")
+MARCADAS             = os.getenv("MARCADAS", "")
+GESTION              = os.getenv("GESTION", "")
+GRABACIONES_X_PAGINA = os.getenv("GRABACIONES_X_PAGINA", "")  # mientras más alto, menos páginas
+
+# === Browser ===
+HEADLESS = _is_truthy(os.getenv("HEADLESS", "true"))
 
 # === Descargas ===
 DOWNLOADS_DIR = Path(os.getenv("DOWNLOADS_DIR", BASE_DIR / "downloads"))
 
 # === HTTP / TLS ===
 TIMEOUT = int(os.getenv("TIMEOUT", "30"))
-SUPPRESS_TLS_WARNINGS = str(os.getenv("SUPPRESS_TLS_WARNINGS", "true")).strip().lower() in (
-    "1", "true", "yes", "y"
-)
+SUPPRESS_TLS_WARNINGS = _is_truthy(os.getenv("SUPPRESS_TLS_WARNINGS", "true"))
 
 # === Carpetas ===
 LOGS_DIR = BASE_DIR / "logs"

@@ -48,6 +48,9 @@ def fill_and_search(page, date_range: str) -> None:
     if settings.GESTION:
         set_checkbox(page, "#id_gestion", settings.GESTION)
         log(f"• gestion = {settings.GESTION}")
+    if settings.GRABACIONES_X_PAGINA:
+        select_option(page, "#id_grabaciones_x_pagina", settings.GRABACIONES_X_PAGINA)
+        log(f"• grabaciones_x_pagina = {settings.GRABACIONES_X_PAGINA}")
 
     # Submit
     try:

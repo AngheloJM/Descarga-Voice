@@ -28,7 +28,7 @@ def run() -> None:
     date_range = _compute_date_range(settings.DAYS_BACK)
     log(f"📅 Rango de descarga: {date_range}")
 
-    with launch_browser(headless=True) as page:
+    with launch_browser(headless=settings.HEADLESS) as page:
         try:
             log("🔐 Iniciando sesión…")
             ensure_logged_in(page)
