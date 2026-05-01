@@ -1,0 +1,11 @@
+"""Timeouts y tiempos de espera centralizados (en milisegundos)."""
+
+SHORT_MS = 1200
+PICKER_MS = 1200
+NET_IDLE_MS = 1500
+PAGINATE_POLL = 80
+PAGINATE_TICKS = 15
+
+EXCEL_READ_RETRIES = 10
+EXCEL_READ_BACKOFF_SEC = 0.5
+EXCEL_POLL_SEC = 1.0

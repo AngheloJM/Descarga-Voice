@@ -1,0 +1,30 @@
+# Python
+venv/
+.env
+*.pyc
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Datos y archivos grandes
+Audios/
+Datos/
+data/
+downloads/
+*.xlsx
+*.png
