@@ -103,6 +103,7 @@ Todos opcionales — si están vacíos, no se aplican.
 | `AGENTE` | select | Acepta el ID numérico del agente o el nombre exacto del label |
 | `MARCADAS` | checkbox | `1`/`true`/`yes`/`sí` para marcar; cualquier otra cosa para desmarcar |
 | `GESTION` | checkbox | Mismo formato que `MARCADAS` |
+| `CAMPANAS` | lista CSV | Una o varias campañas. Acepta IDs o nombres del label, mezclados. Ej: `12,14,GT-POST-BLOQ`. El portal solo permite 1 por búsqueda, así que el bot hace **N búsquedas** y deduplica URLs |
 | `GRABACIONES_X_PAGINA` | select | Cuántas grabaciones muestra por página (`10`, `25`, `50`, `100`...). **Subirlo reduce mucho la cantidad de páginas a recorrer** y hace la descarga más rápida y estable. Recomendado: `100` |
 
 ---
@@ -152,7 +153,14 @@ DAYS_BACK=1
 GESTION=1
 ```
 
-### 6. Combinar varios filtros
+### 6. Varias campañas a la vez
+```ini
+DAYS_BACK=1
+CAMPANAS=12,14,GT-POST-BLOQ
+```
+El bot hace **3 búsquedas** (una por campaña), une los resultados y descarga cada audio una sola vez. Útil cuando trabajas con un grupo definido de campañas.
+
+### 7. Combinar varios filtros
 ```ini
 DAYS_BACK=15
 TIPO_LLAMADA=INBOUND

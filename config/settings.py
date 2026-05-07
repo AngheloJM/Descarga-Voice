@@ -36,6 +36,9 @@ AGENTE               = os.getenv("AGENTE", "")
 MARCADAS             = os.getenv("MARCADAS", "")
 GESTION              = os.getenv("GESTION", "")
 GRABACIONES_X_PAGINA = os.getenv("GRABACIONES_X_PAGINA", "")  # mientras más alto, menos páginas
+# Lista CSV de campañas (ID o nombre exacto). Vacío = sin filtro.
+# Como el portal solo permite 1 campaña por búsqueda, el bot hace N búsquedas y deduplica.
+CAMPANAS = os.getenv("CAMPANAS", "")
 
 # === Browser ===
 HEADLESS = _is_truthy(os.getenv("HEADLESS", "true"))

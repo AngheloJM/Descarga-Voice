@@ -23,10 +23,41 @@ def _compute_date_range(days_back: int) -> str:
     return f"{start.strftime(fmt)} - {today.strftime(fmt)}"
 
 
+def _parse_campanas(s: str) -> list[str]:
+    """Convierte 'a,b,c' en ['a','b','c'] limpiando espacios y vacíos."""
+    return [c.strip() for c in (s or "").split(",") if c.strip()]
+
+
+def _search_one_campana(page, date_range: str, campana: str) -> set[str]:
+    """Llena el formulario para una campaña y devuelve las URLs únicas detectadas."""
+    label = f"campaña '{campana}'" if campana else "(sin filtro de campaña)"
+    log(f"\n🔎 Buscando {label}…")
+
+    try:
+        page.goto(settings.SEARCH_URL, wait_until="domcontentloaded")
+        page.wait_for_selector("form#form-buscar-grabacion", timeout=SHORT_MS)
+        fill_and_search(page, date_range, campana=campana)
+    except Exception as e:
+        log(f"❌ Error en búsqueda de {label}: {e}")
+        dump_debug(page, "search_error", force=True, logs_dir=settings.LOGS_DIR)
+        return set()
+
+    urls = set(paginate_and_collect(page))
+    log(f"   🎧 Audios en {label}: {len(urls)}")
+    return urls
+
+
 def _run_once() -> None:
-    """Una corrida completa: login, búsqueda y descarga."""
+    """Una corrida completa: login, búsqueda(s) por campaña y descarga deduplicada."""
     date_range = _compute_date_range(settings.DAYS_BACK)
     log(f"📅 Rango de descarga: {date_range}")
+
+    campanas = _parse_campanas(settings.CAMPANAS)
+    if campanas:
+        log(f"📋 {len(campanas)} campaña(s) a procesar: {', '.join(campanas)}")
+
+    # Si no hay campañas en .env, hacemos UNA búsqueda sin ese filtro.
+    iter_campanas = campanas or [""]
 
     with launch_browser(headless=settings.HEADLESS) as page:
         try:
@@ -38,27 +69,21 @@ def _run_once() -> None:
             dump_debug(page, "login_error", force=True, logs_dir=settings.LOGS_DIR)
             raise
 
-        try:
-            page.goto(settings.SEARCH_URL, wait_until="domcontentloaded")
-            page.wait_for_selector("form#form-buscar-grabacion", timeout=SHORT_MS)
-            fill_and_search(page, date_range)
-        except Exception as e:
-            log(f"❌ Error en búsqueda: {e}")
-            dump_debug(page, "search_error", force=True, logs_dir=settings.LOGS_DIR)
-            raise
+        all_urls: set[str] = set()
+        for camp in iter_campanas:
+            all_urls.update(_search_one_campana(page, date_range, camp))
 
-        urls = paginate_and_collect(page)
-        log(f"🎧 Audios detectados: {len(urls)}")
+        log(f"\n🎧 Total de audios únicos: {len(all_urls)}")
 
         ok = 0
-        for u in urls:
+        for u in all_urls:
             try:
                 target = download_audio(page, u, settings.DOWNLOADS_DIR)
                 log(f"   ✓ {target.name}")
                 ok += 1
             except Exception as e:
                 log(f"   ✗ Error al descargar: {e}")
-        log(f"📦 Descargados {ok}/{len(urls)}")
+        log(f"📦 Descargados {ok}/{len(all_urls)}")
 
 
 def _parse_run_at(s: str) -> Optional[dtime]:

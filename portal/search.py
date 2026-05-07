@@ -21,8 +21,12 @@ def _tipo_llamada_value(v: str) -> str:
     return TIPO_LLAMADA_MAP.get(s.upper(), s)
 
 
-def fill_and_search(page, date_range: str) -> None:
-    """Llena fecha + filtros opcionales y dispara Buscar."""
+def fill_and_search(page, date_range: str, campana: str = "") -> None:
+    """Llena fecha + filtros opcionales y dispara Buscar.
+
+    `campana` lo pasa el caller (no se lee de settings) para permitir bucles
+    multi-campaña en runner.py. Acepta ID o nombre del label.
+    """
     page.wait_for_selector("form#form-buscar-grabacion", timeout=SHORT_MS)
 
     # Fecha (siempre)
@@ -42,6 +46,9 @@ def fill_and_search(page, date_range: str) -> None:
     if settings.AGENTE:
         select_option(page, "#id_agente", settings.AGENTE)
         log(f"• agente = {settings.AGENTE}")
+    if campana:
+        select_option(page, "#id_campana", campana)
+        log(f"• campana = {campana}")
     if settings.MARCADAS:
         set_checkbox(page, "#id_marcadas", settings.MARCADAS)
         log(f"• marcadas = {settings.MARCADAS}")
