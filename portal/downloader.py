@@ -22,7 +22,13 @@ def filename_from_url(url: str) -> Optional[str]:
 
 
 def download_audio(page, url: str, download_dir: Path) -> Path:
-    """Descarga `url` y devuelve la ruta donde se guardó."""
+    """Descarga `url` y devuelve la ruta final donde se guardó.
+
+    Para garantizar que nunca quede un archivo "completo" si la descarga se
+    interrumpe, primero se guarda como `<nombre>.partial` y luego se renombra
+    atómicamente al nombre final. Si algo falla en el medio, el `.partial`
+    se elimina y la verificación skip-if-exists ignora los `.partial`.
+    """
     with page.expect_event("download") as dl_info:
         page.evaluate(
             """(u) => {
@@ -36,6 +42,18 @@ def download_audio(page, url: str, download_dir: Path) -> Path:
             url,
         )
     dl = dl_info.value
-    target = download_dir / dl.suggested_filename
-    dl.save_as(str(target))
-    return target
+    final = download_dir / dl.suggested_filename
+    partial = final.with_suffix(final.suffix + ".partial")
+
+    try:
+        dl.save_as(str(partial))
+        partial.replace(final)  # rename atómico → no deja final corrupto
+    except Exception:
+        try:
+            if partial.exists():
+                partial.unlink()
+        except Exception:
+            pass
+        raise
+
+    return final

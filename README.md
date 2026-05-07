@@ -236,6 +236,8 @@ El programa tiene **2 modos** según el valor de `RUN_AT`:
 
 El bot es **idempotente**: antes de descargar cada audio, verifica si el archivo ya existe en `DOWNLOADS_DIR`. Si está → lo salta.
 
+Además, cada descarga se guarda primero como `<nombre>.partial` y solo al terminar se renombra al nombre final (operación atómica del sistema de archivos). Esto evita que una descarga interrumpida (Ctrl+C, crash, corte de red) deje un archivo "completo" corrupto: lo peor que puede quedar es un `.partial` huérfano, que el bot ignora en la siguiente corrida.
+
 Esto significa que si el bot se cae a mitad de una corrida (caída de red, crash, Ctrl+C, PC reiniciada), simplemente lo vuelves a correr y continúa **desde donde se detuvo**. No hace falta estado externo ni archivo de control: la fuente de verdad es la propia carpeta de descargas.
 
 Además, cada audio individual se reintenta hasta 2 veces ante errores transitorios antes de marcarse como fallido (útil para baches de red cortos).
