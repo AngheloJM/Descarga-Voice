@@ -85,7 +85,7 @@ SUPPRESS_TLS_WARNINGS=True
 | `PORTAL_PASS` | Sí | Contraseña del portal |
 | `BASE_URL` | Sí | URL base del portal (sin slash final) |
 | `DOWNLOADS_DIR` | No | Carpeta destino. Default: `./downloads` |
-| `DAYS_BACK` | No | Días hacia atrás a descargar. Default: `1` (ayer → hoy) |
+| `DAYS_BACK` | No | Cuántos días **completos** anteriores a hoy descargar. Default: `1` (solo ayer). El día actual nunca se incluye |
 | `HEADLESS` | No | `true`/`false`. Default `true`. Pon `false` para ver el navegador |
 | `RUN_AT` | No | `HH:MM` en hora local para correr en bucle diario. Vacío = one-shot |
 | `TIMEOUT` | No | Timeout HTTP en segundos. Default: `30` |
@@ -117,13 +117,14 @@ Cambia el comportamiento del bot editando solo el archivo `.env`. No necesitas t
 DAYS_BACK=1
 # (filtros en blanco)
 ```
-Descarga todas las llamadas del rango `ayer → hoy`, sin filtros.
+Descarga todas las llamadas de **ayer** (día completo). Hoy queda excluido.
 
-### 2. Última semana, solo llamadas DIALER
+### 2. Última semana (sin contar hoy), solo llamadas DIALER
 ```ini
 DAYS_BACK=7
 TIPO_LLAMADA=DIALER
 ```
+Rango: desde hace 7 días hasta ayer inclusive. **No incluye hoy.**
 
 ### 3. Un agente específico (por ID o por nombre)
 ```ini
@@ -228,6 +229,23 @@ El programa tiene **2 modos** según el valor de `RUN_AT`:
 
 - **Playwright** — Automatización del navegador.
 - **python-dotenv** — Variables de entorno.
+
+---
+
+## 🔁 Resume automático ante caídas
+
+El bot es **idempotente**: antes de descargar cada audio, verifica si el archivo ya existe en `DOWNLOADS_DIR`. Si está → lo salta.
+
+Esto significa que si el bot se cae a mitad de una corrida (caída de red, crash, Ctrl+C, PC reiniciada), simplemente lo vuelves a correr y continúa **desde donde se detuvo**. No hace falta estado externo ni archivo de control: la fuente de verdad es la propia carpeta de descargas.
+
+Además, cada audio individual se reintenta hasta 2 veces ante errores transitorios antes de marcarse como fallido (útil para baches de red cortos).
+
+Al final verás un resumen como:
+```
+📦 Resumen — descargados: 1432, omitidos (ya existían): 80, fallidos: 3
+```
+
+Si quieres re-descargar un archivo específico, simplemente bórralo de `DOWNLOADS_DIR` y vuelve a correr.
 
 ---
 

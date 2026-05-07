@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, time as dtime, timedelta
+from pathlib import Path
 from typing import Optional
 
 from config import settings
@@ -10,17 +11,26 @@ from config.timings import SHORT_MS
 from core.browser import launch_browser
 from core.logger import dump_debug, log
 from portal.auth import ensure_logged_in
-from portal.downloader import download_audio
+from portal.downloader import download_audio, filename_from_url
 from portal.results import paginate_and_collect
 from portal.search import fill_and_search
 
+DOWNLOAD_RETRIES = 2
+RETRY_BACKOFF_SEC = 2
+
 
 def _compute_date_range(days_back: int) -> str:
-    """Devuelve un rango 'dd/mm/yyyy - dd/mm/yyyy' desde hoy hasta `days_back` días atrás."""
+    """Rango 'dd/mm/yyyy - dd/mm/yyyy' de los últimos `days_back` días completos.
+
+    El día de hoy queda EXCLUIDO (porque aún no terminó). Con `days_back=1`
+    el rango es exactamente ayer; con `days_back=7` son los 7 días anteriores
+    a hoy.
+    """
     today = datetime.now().date()
-    start = today - timedelta(days=days_back)
+    end = today - timedelta(days=1)
+    start = today - timedelta(days=max(days_back, 1))
     fmt = "%d/%m/%Y"
-    return f"{start.strftime(fmt)} - {today.strftime(fmt)}"
+    return f"{start.strftime(fmt)} - {end.strftime(fmt)}"
 
 
 def _parse_campanas(s: str) -> list[str]:
@@ -45,6 +55,54 @@ def _search_one_campana(page, date_range: str, campana: str) -> set[str]:
     urls = set(paginate_and_collect(page))
     log(f"   🎧 Audios en {label}: {len(urls)}")
     return urls
+
+
+def _already_downloaded(url: str) -> bool:
+    """True si el archivo de la URL ya existe (con tamaño > 0) en DOWNLOADS_DIR."""
+    name = filename_from_url(url)
+    if not name:
+        return False
+    target = settings.DOWNLOADS_DIR / name
+    try:
+        return target.exists() and target.stat().st_size > 0
+    except Exception:
+        return False
+
+
+def _download_with_retries(page, url: str) -> Path:
+    """Descarga `url` con reintentos en caso de error transitorio."""
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, DOWNLOAD_RETRIES + 1):
+        try:
+            return download_audio(page, url, settings.DOWNLOADS_DIR)
+        except Exception as e:
+            last_exc = e
+            if attempt < DOWNLOAD_RETRIES:
+                log(f"   ⚠️ Intento {attempt}/{DOWNLOAD_RETRIES} falló: {e} — reintentando")
+                time.sleep(RETRY_BACKOFF_SEC * attempt)
+    assert last_exc is not None
+    raise last_exc
+
+
+def _download_all(page, urls: set[str]) -> tuple[int, int, int]:
+    """Descarga las URLs salteando las que ya existen. Devuelve (ok, omitidos, fallidos)."""
+    ok = 0
+    skipped = 0
+    failed = 0
+    total = len(urls)
+
+    for i, u in enumerate(urls, start=1):
+        if _already_downloaded(u):
+            skipped += 1
+            continue
+        try:
+            target = _download_with_retries(page, u)
+            log(f"   [{i}/{total}] ✓ {target.name}")
+            ok += 1
+        except Exception as e:
+            log(f"   [{i}/{total}] ✗ Error definitivo: {e}")
+            failed += 1
+    return ok, skipped, failed
 
 
 def _run_once() -> None:
@@ -75,15 +133,12 @@ def _run_once() -> None:
 
         log(f"\n🎧 Total de audios únicos: {len(all_urls)}")
 
-        ok = 0
-        for u in all_urls:
-            try:
-                target = download_audio(page, u, settings.DOWNLOADS_DIR)
-                log(f"   ✓ {target.name}")
-                ok += 1
-            except Exception as e:
-                log(f"   ✗ Error al descargar: {e}")
-        log(f"📦 Descargados {ok}/{len(all_urls)}")
+        ok, skipped, failed = _download_all(page, all_urls)
+        log(
+            f"📦 Resumen — descargados: {ok}, "
+            f"omitidos (ya existían): {skipped}, "
+            f"fallidos: {failed}"
+        )
 
 
 def _parse_run_at(s: str) -> Optional[dtime]:
