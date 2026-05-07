@@ -87,6 +87,7 @@ SUPPRESS_TLS_WARNINGS=True
 | `DOWNLOADS_DIR` | No | Carpeta destino. Default: `./downloads` |
 | `DAYS_BACK` | No | Días hacia atrás a descargar. Default: `1` (ayer → hoy) |
 | `HEADLESS` | No | `true`/`false`. Default `true`. Pon `false` para ver el navegador |
+| `RUN_AT` | No | `HH:MM` en hora local para correr en bucle diario. Vacío = one-shot |
 | `TIMEOUT` | No | Timeout HTTP en segundos. Default: `30` |
 | `LOGIN_URL` / `SEARCH_URL` / `DOWNLOAD_URL` | No | Override de paths. Default: derivados de `BASE_URL` |
 
@@ -186,16 +187,23 @@ Cualquiera de los dos formatos funciona en `TIPO_LLAMADA=`.
    python main.py
    ```
 
-El programa:
+El programa tiene **2 modos** según el valor de `RUN_AT`:
+
+#### Modo one-shot (`RUN_AT` vacío)
 - Calcula el rango `hoy - DAYS_BACK` → `hoy`.
 - Hace login, busca con ese rango y descarga todo en `DOWNLOADS_DIR`.
-- Si ocurre un error, genera HTML + captura en `logs/`.
-- Termina cuando todas las descargas se completan.
+- Termina cuando se completan las descargas.
+- Ideal para programación externa (Windows Task Scheduler / cron).
 
-### Programación periódica (Windows Task Scheduler)
-1. Abre el "Programador de tareas".
-2. Crear tarea básica → diaria → hora deseada.
-3. Acción: iniciar `venv\Scripts\python.exe` con argumento `main.py`, "Iniciar en" la carpeta del proyecto.
+#### Modo scheduled (`RUN_AT=HH:MM`)
+- El proceso queda **corriendo indefinidamente**.
+- Cada día a la hora indicada (local) ejecuta una corrida completa.
+- Despierta cada 5 minutos para tolerar suspensiones de la PC.
+- Detener con `Ctrl + C`.
+- Ideal si quieres dejar la PC siempre encendida con el bot activo.
+
+> Si vas a usar modo scheduled, asegúrate de que la PC no se duerma:
+> `Configuración → Sistema → Inicio/apagado → Suspender = Nunca`.
 
 ---
 

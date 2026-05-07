@@ -40,6 +40,11 @@ GRABACIONES_X_PAGINA = os.getenv("GRABACIONES_X_PAGINA", "")  # mientras más al
 # === Browser ===
 HEADLESS = _is_truthy(os.getenv("HEADLESS", "true"))
 
+# === Programación ===
+# Si RUN_AT está vacío → one-shot (corre una vez y sale).
+# Si RUN_AT="HH:MM" → bucle infinito que dispara una corrida cada día a esa hora local.
+RUN_AT = os.getenv("RUN_AT", "")
+
 # === Descargas ===
 DOWNLOADS_DIR = Path(os.getenv("DOWNLOADS_DIR", BASE_DIR / "downloads"))
 
