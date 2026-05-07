@@ -46,7 +46,9 @@ HEADLESS = _is_truthy(os.getenv("HEADLESS", "true"))
 RUN_AT = os.getenv("RUN_AT", "")
 
 # === Descargas ===
-DOWNLOADS_DIR = Path(os.getenv("DOWNLOADS_DIR", BASE_DIR / "downloads"))
+# Si DOWNLOADS_DIR está vacío o no existe en .env, cae al default `./downloads`.
+_downloads_raw = os.getenv("DOWNLOADS_DIR", "").strip()
+DOWNLOADS_DIR = Path(_downloads_raw) if _downloads_raw else (BASE_DIR / "downloads")
 
 # === HTTP / TLS ===
 TIMEOUT = int(os.getenv("TIMEOUT", "30"))
