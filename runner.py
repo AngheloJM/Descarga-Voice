@@ -11,7 +11,7 @@ from config.timings import SHORT_MS
 from core.browser import launch_browser
 from core.logger import dump_debug, log
 from portal.auth import ensure_logged_in
-from portal.downloader import download_audio, filename_from_url
+from portal.downloader import download_audio, filename_from_url, target_filename
 from portal.results import paginate_and_collect
 from portal.search import fill_and_search
 
@@ -58,15 +58,23 @@ def _search_one_campana(page, date_range: str, campana: str) -> set[str]:
 
 
 def _already_downloaded(url: str) -> bool:
-    """True si el archivo de la URL ya existe (con tamaño > 0) en DOWNLOADS_DIR."""
-    name = filename_from_url(url)
-    if not name:
-        return False
-    target = settings.DOWNLOADS_DIR / name
-    try:
-        return target.exists() and target.stat().st_size > 0
-    except Exception:
-        return False
+    """True si la URL ya está descargada bajo el nombre nuevo (UID) o el viejo (completo)."""
+    candidates = []
+    new_name = target_filename(url)
+    old_name = filename_from_url(url)
+    if new_name:
+        candidates.append(new_name)
+    if old_name and old_name != new_name:
+        candidates.append(old_name)
+
+    for name in candidates:
+        target = settings.DOWNLOADS_DIR / name
+        try:
+            if target.exists() and target.stat().st_size > 0:
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def _download_with_retries(page, url: str) -> Path:

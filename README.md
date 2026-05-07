@@ -234,7 +234,21 @@ El programa tiene **2 modos** según el valor de `RUN_AT`:
 
 ## 🔁 Resume automático ante caídas
 
-El bot es **idempotente**: antes de descargar cada audio, verifica si el archivo ya existe en `DOWNLOADS_DIR`. Si está → lo salta.
+## 🏷️ Nombre de los archivos descargados
+
+Cada audio se guarda como `<UID>.mp3`, donde `UID` es el identificador único de la llamada en el portal (el segmento final del nombre original tras el último guion).
+
+Ejemplo:
+- URL del portal: `.../Inbound-46-57044762-1777553950.107653.mp3`
+- Archivo guardado: `1777553950.107653.mp3`
+
+> Audios descargados antes de este cambio (con el nombre largo `Inbound-…-…-…mp3`) **se siguen reconociendo** como ya descargados para no re-bajarlos. Si quieres uniformar los nombres, renómbralos a mano una vez.
+
+---
+
+## 🔁 Resume automático ante caídas
+
+El bot es **idempotente**: antes de descargar cada audio, verifica si el archivo ya existe en `DOWNLOADS_DIR` (busca el nombre nuevo `<UID>.mp3` y también el formato viejo). Si está → lo salta.
 
 Además, cada descarga se guarda primero como `<nombre>.partial` y solo al terminar se renombra al nombre final (operación atómica del sistema de archivos). Esto evita que una descarga interrumpida (Ctrl+C, crash, corte de red) deje un archivo "completo" corrupto: lo peor que puede quedar es un `.partial` huérfano, que el bot ignora en la siguiente corrida.
 

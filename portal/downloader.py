@@ -7,10 +7,10 @@ from typing import Optional
 
 
 def filename_from_url(url: str) -> Optional[str]:
-    """Extrae el nombre del archivo del query param `filename` de la URL.
+    """Extrae el nombre original del archivo del query param `filename`.
 
-    Ejemplo: '...?filename=/2026-04-30/Inbound-46-...mp3' → 'Inbound-46-...mp3'.
-    Devuelve None si no se puede determinar.
+    Ejemplo: '...?filename=/2026-04-30/Inbound-46-...-1777553950.107653.mp3'
+             → 'Inbound-46-...-1777553950.107653.mp3'.
     """
     try:
         qs = urllib.parse.urlparse(url).query
@@ -21,13 +21,36 @@ def filename_from_url(url: str) -> Optional[str]:
         return None
 
 
-def download_audio(page, url: str, download_dir: Path) -> Path:
-    """Descarga `url` y devuelve la ruta final donde se guardó.
+def target_filename(url: str) -> Optional[str]:
+    """Devuelve el nombre LOCAL bajo el cual se guarda el audio.
 
-    Para garantizar que nunca quede un archivo "completo" si la descarga se
-    interrumpe, primero se guarda como `<nombre>.partial` y luego se renombra
-    atómicamente al nombre final. Si algo falla en el medio, el `.partial`
-    se elimina y la verificación skip-if-exists ignora los `.partial`.
+    Toma el último segmento tras el último '-' del nombre original (el UID
+    único de la llamada en el portal) y le añade la extensión.
+
+    Ej: 'Inbound-46-57044762-1777553950.107653.mp3' → '1777553950.107653.mp3'.
+
+    Si el nombre no sigue ese patrón, cae al nombre original.
+    """
+    original = filename_from_url(url)
+    if not original:
+        return None
+    p = Path(original)
+    suffix = p.suffix or ".mp3"
+    stem = p.stem
+    if "-" in stem:
+        uid = stem.rsplit("-", 1)[-1].strip()
+        if uid:
+            return f"{uid}{suffix}"
+    return original
+
+
+def download_audio(page, url: str, download_dir: Path) -> Path:
+    """Descarga `url` y la guarda con el UID como nombre.
+
+    Para garantizar atomicidad: primero escribe `<uid>.mp3.partial` y al
+    terminar lo renombra a `<uid>.mp3`. Si la descarga se interrumpe a
+    mitad, lo peor que queda es un `.partial` huérfano que el skip-check
+    ignora en la siguiente corrida.
     """
     with page.expect_event("download") as dl_info:
         page.evaluate(
@@ -42,12 +65,14 @@ def download_audio(page, url: str, download_dir: Path) -> Path:
             url,
         )
     dl = dl_info.value
-    final = download_dir / dl.suggested_filename
+
+    desired = target_filename(url) or dl.suggested_filename
+    final = download_dir / desired
     partial = final.with_suffix(final.suffix + ".partial")
 
     try:
         dl.save_as(str(partial))
-        partial.replace(final)  # rename atómico → no deja final corrupto
+        partial.replace(final)
     except Exception:
         try:
             if partial.exists():
