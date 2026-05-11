@@ -10,6 +10,7 @@ from config import settings
 from config.timings import SHORT_MS
 from core.browser import launch_browser
 from core.logger import dump_debug, log
+from core.share import connect_share, is_unc_path
 from portal.auth import ensure_logged_in
 from portal.downloader import download_audio, filename_from_url, target_filename
 from portal.results import paginate_and_collect
@@ -113,8 +114,24 @@ def _download_all(page, urls: set[str]) -> tuple[int, int, int]:
     return ok, skipped, failed
 
 
+def _ensure_downloads_dir() -> None:
+    """Conecta al share si DOWNLOADS_DIR es UNC con credenciales, y crea la carpeta."""
+    dl = settings.DOWNLOADS_DIR
+    if is_unc_path(dl) and settings.SHARE_USER:
+        connect_share(dl, settings.SHARE_USER, settings.SHARE_PASS)
+    try:
+        dl.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        raise RuntimeError(
+            f"No se puede acceder a DOWNLOADS_DIR={dl}: {e}. "
+            "Si es un share UNC, verifica SHARE_USER/SHARE_PASS o conectividad de red."
+        ) from e
+
+
 def _run_once() -> None:
     """Una corrida completa: login, búsqueda(s) por campaña y descarga deduplicada."""
+    _ensure_downloads_dir()
+
     date_range = _compute_date_range(settings.DAYS_BACK)
     log(f"📅 Rango de descarga: {date_range}")
 

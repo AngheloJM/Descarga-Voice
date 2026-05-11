@@ -53,6 +53,11 @@ RUN_AT = os.getenv("RUN_AT", "")
 _downloads_raw = os.getenv("DOWNLOADS_DIR", "").strip()
 DOWNLOADS_DIR = Path(_downloads_raw) if _downloads_raw else (BASE_DIR / "downloads")
 
+# Credenciales opcionales para shares UNC con autenticación.
+# Solo se usan si DOWNLOADS_DIR es UNC (\\server\share\...).
+SHARE_USER = os.getenv("SHARE_USER", "")
+SHARE_PASS = os.getenv("SHARE_PASS", "")
+
 # === HTTP / TLS ===
 TIMEOUT = int(os.getenv("TIMEOUT", "30"))
 SUPPRESS_TLS_WARNINGS = _is_truthy(os.getenv("SUPPRESS_TLS_WARNINGS", "true"))
@@ -60,5 +65,6 @@ SUPPRESS_TLS_WARNINGS = _is_truthy(os.getenv("SUPPRESS_TLS_WARNINGS", "true"))
 # === Carpetas ===
 LOGS_DIR = BASE_DIR / "logs"
 
-for folder in (LOGS_DIR, DOWNLOADS_DIR):
-    folder.mkdir(parents=True, exist_ok=True)
+# Solo creamos LOGS_DIR acá (siempre local). DOWNLOADS_DIR se crea en runner.py
+# después de autenticar contra el share si es UNC.
+LOGS_DIR.mkdir(parents=True, exist_ok=True)

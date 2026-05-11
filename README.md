@@ -84,7 +84,8 @@ SUPPRESS_TLS_WARNINGS=True
 | `PORTAL_USER` | Sí | Usuario del portal |
 | `PORTAL_PASS` | Sí | Contraseña del portal |
 | `BASE_URL` | Sí | URL base del portal (sin slash final) |
-| `DOWNLOADS_DIR` | No | Carpeta destino. Default: `./downloads` |
+| `DOWNLOADS_DIR` | No | Carpeta destino. Default: `./downloads`. Acepta rutas UNC (`\\server\share\...`) |
+| `SHARE_USER` / `SHARE_PASS` | No | Credenciales del share UNC si requiere autenticación. Solo se usan si `DOWNLOADS_DIR` es UNC. Si Windows ya tiene las creds guardadas, déjalo vacío |
 | `DAYS_BACK` | No | Cuántos días **completos** anteriores a hoy descargar. Default: `1` (solo ayer). El día actual nunca se incluye |
 | `HEADLESS` | No | `true`/`false`. Default `true`. Pon `false` para ver el navegador |
 | `RUN_AT` | No | `HH:MM` en hora local para correr en bucle diario. Vacío = one-shot |
