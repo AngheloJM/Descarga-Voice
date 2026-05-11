@@ -1,7 +1,13 @@
-"""Script de diagnóstico: prueba conexión, lectura y escritura en DOWNLOADS_DIR.
+"""Script de diagnóstico: prueba la conexión al share y la existencia de DOWNLOADS_DIR.
 
 NO es un test automatizado: requiere `.env` real, credenciales y red.
 Se invoca a mano para validar configuración antes de correr el bot.
+
+Comprueba únicamente:
+  1. Conectividad/credenciales al share (si es UNC y hay credenciales).
+  2. Que `DOWNLOADS_DIR` exista.
+
+No lista contenidos ni escribe archivos en el destino.
 
 Uso:
     py scripts\\diagnose_share.py
@@ -11,7 +17,6 @@ Sale con código 0 si todo OK, 1 si algo falla.
 from __future__ import annotations
 
 import sys
-import time
 from pathlib import Path
 
 # Permite ejecutar el script directamente desde la raíz del repo.
@@ -33,9 +38,7 @@ def main() -> int:
     log("=" * 60)
 
     # 1) Conectar al share si aplica.
-    # Forzamos una sesión fresca: si hay una sesión previa, se cierra primero
-    # para que el test realmente valide las credenciales del .env (sin esto,
-    # un cache de Windows podría hacer que el test "pase" con otras creds).
+    # Forzamos una sesión fresca para validar realmente las credenciales del .env.
     if is_unc_path(dl) and settings.USUARIO_COMPARTIDA:
         log("\n🔓 Cerrando sesiones previas (para probar credenciales limpias)…")
         disconnect_share(dl)
@@ -60,47 +63,8 @@ def main() -> int:
         log(f"   ✗ No se puede acceder: {e}")
         return 1
 
-    # 3) Listar contenido
-    log("\n📖 Listando contenido…")
-    try:
-        items = list(dl.iterdir())
-        log(f"   ✓ OK — {len(items)} elemento(s)")
-    except Exception as e:
-        log(f"   ✗ Error al listar: {e}")
-        return 1
-
-    # 4) Escribir archivo de prueba
-    test_file = dl / f".bot_test_{int(time.time())}.txt"
-    log(f"\n✏️  Escribiendo archivo de prueba ({test_file.name})…")
-    try:
-        test_file.write_text("hola desde el bot\n", encoding="utf-8")
-        log(f"   ✓ Escritura OK ({test_file.stat().st_size} bytes)")
-    except Exception as e:
-        log(f"   ✗ No se puede escribir: {e}")
-        return 1
-
-    # 5) Leer de vuelta
-    log("\n📚 Leyendo el archivo de prueba…")
-    try:
-        content = test_file.read_text(encoding="utf-8").strip()
-        if content != "hola desde el bot":
-            log(f"   ⚠️ Contenido inesperado: {content!r}")
-            return 1
-        log("   ✓ Lectura OK (contenido coincide)")
-    except Exception as e:
-        log(f"   ✗ No se puede leer: {e}")
-        return 1
-
-    # 6) Borrar archivo de prueba
-    log("\n🧹 Borrando archivo de prueba…")
-    try:
-        test_file.unlink()
-        log("   ✓ Borrado OK")
-    except Exception as e:
-        log(f"   ⚠️ No se pudo borrar (no crítico): {e}")
-
     log("\n" + "=" * 60)
-    log("✅ TODO OK — el bot puede leer/escribir en este destino.")
+    log("✅ Conexión OK y carpeta destino disponible.")
     log("=" * 60)
     return 0
 

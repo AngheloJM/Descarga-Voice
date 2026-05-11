@@ -242,10 +242,11 @@ py scripts\diagnose_share.py
 ```
 
 El script:
-1. Lee `.env` y conecta al share (si hay `USUARIO_COMPARTIDA` / `PASS_COMPARTIDA`).
-2. Crea la carpeta si no existe.
-3. Hace lectura + escritura + borrado de un archivo de prueba.
-4. Devuelve `0` si OK, `1` si algo falla, con mensaje claro de qué falló.
+1. Lee `.env` y prueba la conexión al share (forzando re-autenticación con `USUARIO_COMPARTIDA` / `PASS_COMPARTIDA`).
+2. Verifica que `DOWNLOADS_DIR` exista (no la crea — si falta, te dice que la crees manualmente).
+3. Devuelve `0` si OK, `1` si algo falla, con mensaje claro de qué falló.
+
+> El script **no** lista contenidos ni escribe archivos de prueba en el destino. Solo valida conexión y existencia.
 
 ---
 
