@@ -23,7 +23,8 @@ Es un proceso **one-shot**: se ejecuta una vez, descarga, y termina. Para correr
 │
 ├── core/                    # Infraestructura genérica
 │   ├── browser.py           # Context manager Playwright
-│   └── logger.py            # log(), ts(), dump_debug()
+│   ├── logger.py            # log(), ts(), dump_debug()
+│   └── share.py             # Conexión a shares UNC vía net use
 │
 ├── portal/                  # Adaptadores del sitio
 │   ├── auth.py              # Login
@@ -34,7 +35,10 @@ Es un proceso **one-shot**: se ejecuta una vez, descarga, y termina. Para correr
 │   └── downloader.py        # Descarga de archivos
 │
 ├── utils/                   # Utilidades genéricas
-│   └── values.py            # is_empty, to_str, etc.
+│   └── values.py            # is_empty, is_truthy
+│
+├── scripts/                 # Scripts manuales de operación/diagnóstico
+│   └── diagnose_share.py    # Prueba conexión + lectura/escritura en DOWNLOADS_DIR
 │
 ├── downloads/               # Archivos descargados
 └── logs/                    # Errores y capturas (HTML + PNG)
@@ -224,10 +228,24 @@ El programa tiene **2 modos** según el valor de `RUN_AT`:
 
 ## 🛠️ Debug
 
-- Para ver el navegador en acción, cambia `headless=True` a `False` en [core/browser.py](core/browser.py).
+- Para ver el navegador en acción, pon `HEADLESS=false` en `.env`.
 - Los errores se guardan en `logs/` como:
   - HTML (`.html`)
   - Captura de pantalla (`.png`)
+
+### Diagnóstico del share UNC
+
+Si `DOWNLOADS_DIR` apunta a una ruta de red, antes de correr el bot puedes validar la conexión:
+
+```
+py scripts\diagnose_share.py
+```
+
+El script:
+1. Lee `.env` y conecta al share (si hay `USUARIO_COMPARTIDA` / `PASS_COMPARTIDA`).
+2. Crea la carpeta si no existe.
+3. Hace lectura + escritura + borrado de un archivo de prueba.
+4. Devuelve `0` si OK, `1` si algo falla, con mensaje claro de qué falló.
 
 ---
 
