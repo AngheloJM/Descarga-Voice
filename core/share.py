@@ -28,6 +28,41 @@ def _share_root(path) -> Optional[str]:
     return root or None
 
 
+def disconnect_share(path) -> bool:
+    """Cierra cualquier sesión `net use` activa contra el share del `path`.
+
+    Idempotente: si no había sesión, devuelve True igual. Útil para forzar
+    una reconexión con credenciales nuevas (ej. en scripts de diagnóstico).
+    """
+    root = _share_root(path)
+    if not root:
+        return False
+
+    try:
+        result = subprocess.run(
+            ["net", "use", root, "/delete", "/yes"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except Exception as e:
+        log(f"⚠️ No pude ejecutar 'net use /delete' para {root}: {e}")
+        return False
+
+    if result.returncode == 0:
+        log(f"🔓 Sesión cerrada: {root}")
+        return True
+
+    err = (result.stderr or result.stdout or "").strip().lower()
+    # No había nada conectado → eso también es "OK" para nuestros fines.
+    if "no se encontró" in err or "no se encontro" in err or "could not be found" in err or "2250" in err:
+        log(f"   (no había sesión activa contra {root})")
+        return True
+
+    log(f"⚠️ 'net use /delete' devolvió {result.returncode} para {root}: {err}")
+    return False
+
+
 def connect_share(path, user: str, password: str) -> bool:
     """Establece una sesión `net use` contra el share del `path`.
 

@@ -21,7 +21,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from config import settings  # noqa: E402
 from core.logger import log  # noqa: E402
-from core.share import connect_share, is_unc_path  # noqa: E402
+from core.share import connect_share, disconnect_share, is_unc_path  # noqa: E402
 
 
 def main() -> int:
@@ -32,8 +32,14 @@ def main() -> int:
     log(f"   Usuario share: {settings.USUARIO_COMPARTIDA or '(vacío)'}")
     log("=" * 60)
 
-    # 1) Conectar al share si aplica
+    # 1) Conectar al share si aplica.
+    # Forzamos una sesión fresca: si hay una sesión previa, se cierra primero
+    # para que el test realmente valide las credenciales del .env (sin esto,
+    # un cache de Windows podría hacer que el test "pase" con otras creds).
     if is_unc_path(dl) and settings.USUARIO_COMPARTIDA:
+        log("\n🔓 Cerrando sesiones previas (para probar credenciales limpias)…")
+        disconnect_share(dl)
+
         log(f"\n🔐 Conectando al share con usuario '{settings.USUARIO_COMPARTIDA}'…")
         if not connect_share(dl, settings.USUARIO_COMPARTIDA, settings.PASS_COMPARTIDA):
             log("❌ No se pudo conectar al share. Verifica USUARIO_COMPARTIDA / PASS_COMPARTIDA.")
