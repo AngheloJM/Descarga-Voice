@@ -61,7 +61,12 @@ Es un proceso **one-shot**: se ejecuta una vez, descarga, y termina. Para correr
    playwright install
    ```
 
-4. Crear archivo `.env` con tus credenciales y rutas (ver sección "Variables de entorno").
+4. Crear el archivo `.env` copiando el template incluido:
+   ```
+   cp .env.example .env          # Linux/Mac
+   copy .env.example .env        # Windows
+   ```
+   Luego edítalo y completa al menos `PORTAL_USER`, `PORTAL_PASS` y `BASE_URL`.
 
 ---
 
@@ -85,7 +90,7 @@ SUPPRESS_TLS_WARNINGS=True
 | `PORTAL_PASS` | Sí | Contraseña del portal |
 | `BASE_URL` | Sí | URL base del portal (sin slash final) |
 | `DOWNLOADS_DIR` | No | Carpeta destino. Default: `./downloads`. Acepta rutas UNC (`\\server\share\...`) |
-| `SHARE_USER` / `SHARE_PASS` | No | Credenciales del share UNC si requiere autenticación. Solo se usan si `DOWNLOADS_DIR` es UNC. Si Windows ya tiene las creds guardadas, déjalo vacío |
+| `USUARIO_COMPARTIDA` / `PASS_COMPARTIDA` | No | Credenciales del share UNC si requiere autenticación. Solo se usan si `DOWNLOADS_DIR` es UNC. Si Windows ya tiene las creds guardadas, déjalo vacío |
 | `DAYS_BACK` | No | Cuántos días **completos** anteriores a hoy descargar. Default: `1` (solo ayer). El día actual nunca se incluye |
 | `HEADLESS` | No | `true`/`false`. Default `true`. Pon `false` para ver el navegador |
 | `RUN_AT` | No | `HH:MM` en hora local para correr en bucle diario. Vacío = one-shot |

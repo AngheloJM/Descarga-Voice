@@ -117,14 +117,14 @@ def _download_all(page, urls: set[str]) -> tuple[int, int, int]:
 def _ensure_downloads_dir() -> None:
     """Conecta al share si DOWNLOADS_DIR es UNC con credenciales, y crea la carpeta."""
     dl = settings.DOWNLOADS_DIR
-    if is_unc_path(dl) and settings.SHARE_USER:
-        connect_share(dl, settings.SHARE_USER, settings.SHARE_PASS)
+    if is_unc_path(dl) and settings.USUARIO_COMPARTIDA:
+        connect_share(dl, settings.USUARIO_COMPARTIDA, settings.PASS_COMPARTIDA)
     try:
         dl.mkdir(parents=True, exist_ok=True)
     except Exception as e:
         raise RuntimeError(
             f"No se puede acceder a DOWNLOADS_DIR={dl}: {e}. "
-            "Si es un share UNC, verifica SHARE_USER/SHARE_PASS o conectividad de red."
+            "Si es un share UNC, verifica USUARIO_COMPARTIDA/PASS_COMPARTIDA o conectividad de red."
         ) from e
 
 

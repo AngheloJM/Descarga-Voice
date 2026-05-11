@@ -55,8 +55,8 @@ DOWNLOADS_DIR = Path(_downloads_raw) if _downloads_raw else (BASE_DIR / "downloa
 
 # Credenciales opcionales para shares UNC con autenticación.
 # Solo se usan si DOWNLOADS_DIR es UNC (\\server\share\...).
-SHARE_USER = os.getenv("SHARE_USER", "")
-SHARE_PASS = os.getenv("SHARE_PASS", "")
+USUARIO_COMPARTIDA = os.getenv("USUARIO_COMPARTIDA", "")
+PASS_COMPARTIDA = os.getenv("PASS_COMPARTIDA", "")
 
 # === HTTP / TLS ===
 TIMEOUT = int(os.getenv("TIMEOUT", "30"))
