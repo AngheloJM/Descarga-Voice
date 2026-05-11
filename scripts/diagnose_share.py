@@ -48,13 +48,16 @@ def main() -> int:
         log("\nℹ️  Es UNC pero USUARIO_COMPARTIDA está vacío.")
         log("   Se asume que Windows ya tiene credenciales guardadas (cmdkey).")
 
-    # 2) Crear la carpeta si no existe
-    log("\n📁 Verificando/creando carpeta…")
+    # 2) Verificar que la carpeta exista (NO la creamos)
+    log("\n📁 Verificando que la carpeta exista…")
     try:
-        dl.mkdir(parents=True, exist_ok=True)
+        if not dl.exists():
+            log(f"   ✗ La carpeta no existe: {dl}")
+            log("     Créala manualmente en el destino antes de correr el bot.")
+            return 1
         log(f"   ✓ Carpeta accesible: {dl}")
     except Exception as e:
-        log(f"   ✗ No se puede acceder/crear: {e}")
+        log(f"   ✗ No se puede acceder: {e}")
         return 1
 
     # 3) Listar contenido
