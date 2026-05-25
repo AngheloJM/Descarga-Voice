@@ -34,11 +34,19 @@ Es un proceso **one-shot**: se ejecuta una vez, descarga, y termina. Para correr
 │   ├── results.py           # Extracción de URLs + paginación
 │   └── downloader.py        # Descarga de archivos
 │
+├── domain/                  # Modelos del dominio
+│   └── audio_row.py         # @dataclass AudioRow (una grabación del portal)
+│
+├── reports/                 # Generación y envío de reportes
+│   ├── csv_writer.py        # Reporte CSV detallado
+│   └── email_sender.py      # SMTP (Outlook / Office 365)
+│
 ├── utils/                   # Utilidades genéricas
 │   └── values.py            # is_empty, is_truthy
 │
 ├── scripts/                 # Scripts manuales de operación/diagnóstico
-│   └── diagnose_share.py    # Prueba conexión + lectura/escritura en DOWNLOADS_DIR
+│   ├── diagnose_share.py    # Prueba conexión al share UNC
+│   └── diagnose_email.py    # Prueba envío SMTP
 │
 ├── downloads/               # Archivos descargados
 └── logs/                    # Errores y capturas (HTML + PNG)
@@ -100,6 +108,26 @@ SUPPRESS_TLS_WARNINGS=True
 | `RUN_AT` | No | `HH:MM` en hora local para correr en bucle diario. Vacío = one-shot |
 | `TIMEOUT` | No | Timeout HTTP en segundos. Default: `30` |
 | `LOGIN_URL` / `SEARCH_URL` / `DOWNLOAD_URL` | No | Override de paths. Default: derivados de `BASE_URL` |
+
+### Reporte por email (opcional)
+
+Después de cada corrida, el bot genera un CSV con el detalle de cada audio (UID, fecha, agente, campaña, etc. + estado de descarga). Si configuras SMTP, el CSV se envía adjunto.
+
+| Variable | Notas |
+|---|---|
+| `REPORT_EMAIL_TO` | Destinatario. Si está vacío, **no se envía email** (CSV se genera localmente igual en `logs/reportes/`) |
+| `REPORT_EMAIL_FROM` | Remitente. Si está vacío, usa `REPORT_SMTP_USER` |
+| `REPORT_SMTP_HOST` | Default: `smtp-mail.outlook.com` (Outlook personal). Para corporativo: `smtp.office365.com` |
+| `REPORT_SMTP_PORT` | Default: `587` (STARTTLS) |
+| `REPORT_SMTP_USER` | Tu correo Outlook completo |
+| `REPORT_SMTP_PASS` | Tu password (o **App Password** si tienes MFA habilitado) |
+
+> Para Outlook 365 corporativo, Basic Auth SMTP suele estar deshabilitado por IT. Si te da `SMTPAuthenticationError`, pide a IT que habilite SMTP para tu cuenta, o usa una cuenta personal de Outlook.com con [App Password](https://account.live.com/proofs/Manage).
+
+Prueba el SMTP antes de correr el bot:
+```
+py scripts\diagnose_email.py
+```
 
 ### Filtros opcionales del formulario
 

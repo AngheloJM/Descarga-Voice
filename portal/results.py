@@ -1,13 +1,14 @@
-"""Extracción de URLs de audio en la tabla de resultados (con paginación robusta)."""
+"""Extracción de filas de la tabla de resultados (con paginación robusta)."""
 from __future__ import annotations
 
-from typing import List, Set
+from typing import List
 
 from playwright.sync_api import TimeoutError as PWTimeout
 
 from config import settings
 from config.timings import PAGINATE_TIMEOUT_MS, SHORT_MS
 from core.logger import log
+from domain.audio_row import AudioRow
 
 AUDIO_HREF_FILTER = "/api/v1/grabacion/archivo/?filename="
 
@@ -16,29 +17,57 @@ def _abs_url(ref: str) -> str:
     return ref if ref.startswith("http") else f"{settings.BASE_URL}{ref}"
 
 
-def extract_audio_urls(page) -> List[str]:
-    """Recoge las URLs de audio visibles en la tabla actual."""
-    urls: Set[str] = set()
+def extract_audio_rows(page) -> List[AudioRow]:
+    """Recoge filas completas (con metadatos) de la tabla actual."""
+    raw = page.evaluate(
+        """
+        () => {
+            const rows = document.querySelectorAll('#table-body tr');
+            const out = [];
+            for (const row of rows) {
+                const tds = row.querySelectorAll('td');
+                if (tds.length < 8) continue;
 
-    anchors = page.locator(f"#table-body a[href*='{AUDIO_HREF_FILTER}']")
-    try:
-        for i in range(anchors.count()):
-            href = anchors.nth(i).get_attribute("href") or ""
-            if href:
-                urls.add(_abs_url(href))
-    except Exception:
-        pass
+                // URL: priorizar <source>, fallback al <a>
+                let url = '';
+                const source = row.querySelector('source[src*="/api/v1/grabacion/archivo"]');
+                if (source) url = source.getAttribute('src') || '';
+                if (!url) {
+                    const link = row.querySelector('a[href*="/api/v1/grabacion/archivo"]');
+                    if (link) url = link.getAttribute('href') || '';
+                }
+                if (!url) continue;
 
-    sources = page.locator(f"#table-body source[src*='{AUDIO_HREF_FILTER}']")
-    try:
-        for i in range(sources.count()):
-            src = sources.nth(i).get_attribute("src") or ""
-            if src:
-                urls.add(_abs_url(src))
-    except Exception:
-        pass
+                const txt = (i) => ((tds[i] && tds[i].innerText) || '').trim();
+                out.push({
+                    url: url,
+                    fecha:       txt(2),
+                    tipo:        txt(3),
+                    tel_cliente: txt(4),
+                    agente:      txt(5),
+                    campana:     txt(6),
+                    username:    txt(10),
+                });
+            }
+            return out;
+        }
+        """
+    )
 
-    return list(urls)
+    rows: List[AudioRow] = []
+    for r in raw or []:
+        rows.append(
+            AudioRow(
+                url=_abs_url(r.get("url", "")),
+                fecha=r.get("fecha", ""),
+                tipo=r.get("tipo", ""),
+                tel_cliente=r.get("tel_cliente", ""),
+                agente=r.get("agente", ""),
+                campana=r.get("campana", ""),
+                username=r.get("username", ""),
+            )
+        )
+    return rows
 
 
 def _table_signature(page) -> str:
@@ -104,21 +133,28 @@ def _click_next(page) -> bool:
         return False
 
 
-def paginate_and_collect(page) -> List[str]:
-    """Recorre todas las páginas con el botón Siguiente y acumula URLs únicas."""
-    collected: Set[str] = set()
+def paginate_and_collect(page) -> List[AudioRow]:
+    """Recorre todas las páginas con 'Siguiente' y acumula filas únicas por URL."""
+    seen_urls: set[str] = set()
+    collected: List[AudioRow] = []
+
+    def add(rows: List[AudioRow]) -> None:
+        for r in rows:
+            if r.url and r.url not in seen_urls:
+                seen_urls.add(r.url)
+                collected.append(r)
 
     try:
         page.wait_for_selector("#table-body", timeout=SHORT_MS)
     except PWTimeout:
-        return list(collected)
+        return collected
 
     total = _detect_total_pages(page)
     log(f"   📄 {total} página(s) detectada(s)")
 
     page_num = 1
-    collected.update(extract_audio_urls(page))
-    log(f"   • Página {page_num}/{total}: {len(collected)} URLs únicas")
+    add(extract_audio_rows(page))
+    log(f"   • Página {page_num}/{total}: {len(collected)} filas únicas")
 
     while True:
         before_sig = _table_signature(page)
@@ -130,7 +166,7 @@ def paginate_and_collect(page) -> List[str]:
             break
 
         page_num += 1
-        collected.update(extract_audio_urls(page))
-        log(f"   • Página {page_num}/{total}: {len(collected)} URLs únicas")
+        add(extract_audio_rows(page))
+        log(f"   • Página {page_num}/{total}: {len(collected)} filas únicas")
 
-    return list(collected)
+    return collected

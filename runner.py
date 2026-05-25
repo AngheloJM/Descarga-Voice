@@ -1,20 +1,24 @@
-"""Descarga: login → buscar últimos N días → descargar → salir o repetir cada día."""
+"""Descarga: login → buscar últimos N días → descargar → reportar → salir o repetir."""
 from __future__ import annotations
 
 import time
+from collections import Counter
 from datetime import datetime, time as dtime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from config import settings
 from config.timings import SHORT_MS
 from core.browser import launch_browser
 from core.logger import dump_debug, log
 from core.share import connect_share, is_unc_path
+from domain.audio_row import AudioRow
 from portal.auth import ensure_logged_in
-from portal.downloader import download_audio, filename_from_url, target_filename
+from portal.downloader import download_audio
 from portal.results import paginate_and_collect
 from portal.search import fill_and_search
+from reports.csv_writer import write_csv
+from reports.email_sender import send_report
 
 DOWNLOAD_RETRIES = 2
 RETRY_BACKOFF_SEC = 2
@@ -39,8 +43,8 @@ def _parse_campanas(s: str) -> list[str]:
     return [c.strip() for c in (s or "").split(",") if c.strip()]
 
 
-def _search_one_campana(page, date_range: str, campana: str) -> set[str]:
-    """Llena el formulario para una campaña y devuelve las URLs únicas detectadas."""
+def _search_one_campana(page, date_range: str, campana: str) -> List[AudioRow]:
+    """Llena el formulario para una campaña y devuelve las filas únicas detectadas."""
     label = f"campaña '{campana}'" if campana else "(sin filtro de campaña)"
     log(f"\n🔎 Buscando {label}…")
 
@@ -51,21 +55,24 @@ def _search_one_campana(page, date_range: str, campana: str) -> set[str]:
     except Exception as e:
         log(f"❌ Error en búsqueda de {label}: {e}")
         dump_debug(page, "search_error", force=True, logs_dir=settings.LOGS_DIR)
-        return set()
+        return []
 
-    urls = set(paginate_and_collect(page))
-    log(f"   🎧 Audios en {label}: {len(urls)}")
-    return urls
+    rows = paginate_and_collect(page)
+    log(f"   🎧 Audios en {label}: {len(rows)}")
+    return rows
 
 
-def _already_downloaded(url: str) -> bool:
-    """True si la URL ya está descargada bajo el nombre nuevo (UID) o el viejo (completo)."""
+def _already_downloaded(row: AudioRow) -> bool:
+    """True si el archivo de `row` ya existe (con tamaño > 0) en DOWNLOADS_DIR.
+
+    Acepta tanto el nombre nuevo (UID) como el viejo (completo).
+    """
     candidates = []
-    new_name = target_filename(url)
-    old_name = filename_from_url(url)
-    if new_name:
-        candidates.append(new_name)
-    if old_name and old_name != new_name:
+    if row.expected_filename:
+        candidates.append(row.expected_filename)
+    from portal.downloader import filename_from_url
+    old_name = filename_from_url(row.url)
+    if old_name and old_name not in candidates:
         candidates.append(old_name)
 
     for name in candidates:
@@ -93,25 +100,23 @@ def _download_with_retries(page, url: str) -> Path:
     raise last_exc
 
 
-def _download_all(page, urls: set[str]) -> tuple[int, int, int]:
-    """Descarga las URLs salteando las que ya existen. Devuelve (ok, omitidos, fallidos)."""
-    ok = 0
-    skipped = 0
-    failed = 0
-    total = len(urls)
-
-    for i, u in enumerate(urls, start=1):
-        if _already_downloaded(u):
-            skipped += 1
+def _download_all(page, rows: List[AudioRow]) -> None:
+    """Descarga cada fila salteando las que ya existen. Mutates `rows[i].status`."""
+    total = len(rows)
+    for i, r in enumerate(rows, start=1):
+        if _already_downloaded(r):
+            r.status = "skipped"
+            r.saved_as = r.expected_filename or ""
             continue
         try:
-            target = _download_with_retries(page, u)
+            target = _download_with_retries(page, r.url)
+            r.status = "ok"
+            r.saved_as = target.name
             log(f"   [{i}/{total}] ✓ {target.name}")
-            ok += 1
         except Exception as e:
+            r.status = "failed"
+            r.error = str(e)
             log(f"   [{i}/{total}] ✗ Error definitivo: {e}")
-            failed += 1
-    return ok, skipped, failed
 
 
 def _ensure_downloads_dir() -> None:
@@ -139,10 +144,62 @@ def _ensure_downloads_dir() -> None:
         )
 
 
+def _generate_report(rows: List[AudioRow]) -> Optional[Path]:
+    """Escribe el reporte CSV y devuelve la ruta. Devuelve None si no hay filas."""
+    if not rows:
+        log("📊 No hay filas para reportar.")
+        return None
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    csv_path = settings.LOGS_DIR / "reportes" / f"reporte_{stamp}.csv"
+    write_csv(csv_path, rows)
+    log(f"📊 Reporte CSV: {csv_path}")
+    return csv_path
+
+
+def _send_email_report(
+    csv_path: Path,
+    date_range: str,
+    rows: List[AudioRow],
+    duration_sec: float,
+) -> None:
+    """Compone el cuerpo del email con un resumen y lo envía con el CSV adjunto."""
+    counts = Counter(r.status for r in rows)
+    by_camp: Counter[str] = Counter()
+    for r in rows:
+        if r.status in ("ok", "skipped"):
+            by_camp[r.campana or "(sin campaña)"] += 1
+
+    body_lines = [
+        f"Reporte de descarga — {date_range}",
+        f"Fecha de ejecución: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Duración: {duration_sec:.1f} segundos",
+        "",
+        f"Total de audios encontrados: {len(rows)}",
+        f"  Descargados:  {counts.get('ok', 0)}",
+        f"  Omitidos:     {counts.get('skipped', 0)} (ya existían)",
+        f"  Fallidos:     {counts.get('failed', 0)}",
+        "",
+    ]
+
+    if by_camp:
+        body_lines.append("Por campaña (ok + omitidos):")
+        for camp, n in sorted(by_camp.items(), key=lambda kv: -kv[1]):
+            body_lines.append(f"  • {camp}: {n}")
+        body_lines.append("")
+
+    body_lines.append("Detalle completo: ver el CSV adjunto.")
+    body = "\n".join(body_lines)
+
+    subject = f"[Bot Descarga] {date_range} — {counts.get('ok', 0)} ok / {counts.get('failed', 0)} fallidos"
+    send_report(csv_path, subject=subject, body=body)
+
+
 def _run_once() -> None:
-    """Una corrida completa: login, búsqueda(s) por campaña y descarga deduplicada."""
+    """Una corrida completa: login, búsqueda(s) por campaña, descarga y reporte."""
     _ensure_downloads_dir()
 
+    start_ts = time.monotonic()
     date_range = _compute_date_range(settings.DAYS_BACK)
     log(f"📅 Rango de descarga: {date_range}")
 
@@ -150,8 +207,9 @@ def _run_once() -> None:
     if campanas:
         log(f"📋 {len(campanas)} campaña(s) a procesar: {', '.join(campanas)}")
 
-    # Si no hay campañas en .env, hacemos UNA búsqueda sin ese filtro.
     iter_campanas = campanas or [""]
+    all_rows: List[AudioRow] = []
+    seen_urls: set[str] = set()
 
     with launch_browser(headless=settings.HEADLESS) as page:
         try:
@@ -163,18 +221,31 @@ def _run_once() -> None:
             dump_debug(page, "login_error", force=True, logs_dir=settings.LOGS_DIR)
             raise
 
-        all_urls: set[str] = set()
+        # Recolectar filas únicas (por URL) atravesando todas las campañas.
         for camp in iter_campanas:
-            all_urls.update(_search_one_campana(page, date_range, camp))
+            for r in _search_one_campana(page, date_range, camp):
+                if r.url not in seen_urls:
+                    seen_urls.add(r.url)
+                    all_rows.append(r)
 
-        log(f"\n🎧 Total de audios únicos: {len(all_urls)}")
+        log(f"\n🎧 Total de audios únicos: {len(all_rows)}")
 
-        ok, skipped, failed = _download_all(page, all_urls)
-        log(
-            f"📦 Resumen — descargados: {ok}, "
-            f"omitidos (ya existían): {skipped}, "
-            f"fallidos: {failed}"
-        )
+        # Descargar (mutates status en cada fila).
+        _download_all(page, all_rows)
+
+    # Resumen + reporte.
+    duration_sec = time.monotonic() - start_ts
+    counts = Counter(r.status for r in all_rows)
+    log(
+        f"📦 Resumen — descargados: {counts.get('ok', 0)}, "
+        f"omitidos (ya existían): {counts.get('skipped', 0)}, "
+        f"fallidos: {counts.get('failed', 0)} "
+        f"(en {duration_sec:.1f}s)"
+    )
+
+    csv_path = _generate_report(all_rows)
+    if csv_path:
+        _send_email_report(csv_path, date_range, all_rows, duration_sec)
 
 
 def _parse_run_at(s: str) -> Optional[dtime]:

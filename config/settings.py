@@ -58,6 +58,17 @@ DOWNLOADS_DIR = Path(_downloads_raw) if _downloads_raw else (BASE_DIR / "downloa
 USUARIO_COMPARTIDA = os.getenv("USUARIO_COMPARTIDA", "")
 PASS_COMPARTIDA = os.getenv("PASS_COMPARTIDA", "")
 
+# === Reporte por email (opt-in) ===
+# Si REPORT_EMAIL_TO está vacío, no se envía nada.
+# Defaults para Outlook personal (smtp-mail.outlook.com:587).
+# Para Office 365 corporativo: REPORT_SMTP_HOST=smtp.office365.com
+REPORT_EMAIL_TO   = os.getenv("REPORT_EMAIL_TO", "")
+REPORT_EMAIL_FROM = os.getenv("REPORT_EMAIL_FROM", "")  # default: REPORT_SMTP_USER
+REPORT_SMTP_HOST  = os.getenv("REPORT_SMTP_HOST", "smtp-mail.outlook.com")
+REPORT_SMTP_PORT  = int(os.getenv("REPORT_SMTP_PORT", "587"))
+REPORT_SMTP_USER  = os.getenv("REPORT_SMTP_USER", "")
+REPORT_SMTP_PASS  = os.getenv("REPORT_SMTP_PASS", "")
+
 # === HTTP / TLS ===
 TIMEOUT = int(os.getenv("TIMEOUT", "30"))
 SUPPRESS_TLS_WARNINGS = _is_truthy(os.getenv("SUPPRESS_TLS_WARNINGS", "true"))
